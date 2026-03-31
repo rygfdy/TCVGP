@@ -1,0 +1,19 @@
+nu = 5.000000, alpha = 0.200000, epsilon = 0.200000, sigma0 = 1.000000
+Z = 1.25331414
+mean_p = 0.156478, var_p = 0.975515, std_p = 0.987681
+mean_q = 0.156478, var_q = 0.975515, std_q = 0.987681
+mode_p = 0.155635, mode_q = 0.156478
+sigma_p - sigma_q = 0.000000e+00
+var_p - var_q = 1.110223e-16
+KL(q||p) objective (up to additive log Z) = -0.22579111
+V''' zero crossings: none
+sign of V''' on intervals: (-12.000, 12.000): -
+q - p zero crossings: -1.5280, 0.1818, 1.8921
+sign of q-p on intervals: (-12.000, -1.528): + | (-1.528, 0.182): - | (0.182, 1.892): + | (1.892, 12.000): -
+Q - P zero crossings: -0.8106, 1.1640
+sign of Q-P on intervals: (-12.000, -0.811): + | (-0.811, 1.164): - | (1.164, 12.000): +
+max |Q-P| = 1.135868e-04 at x = 0.1800
+Q-P evaluated at roots of q-p (these are extrema of Q-P):
+  x = -1.5280, Q-P = 5.023936e-05
+  x = 0.1818, Q-P = -1.135838e-04
+  x = 1.8921, Q-P = 5.113382e-05
