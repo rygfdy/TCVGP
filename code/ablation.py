@@ -776,35 +776,6 @@ def main():
     fig.tight_layout()
     plt.show()
 
-    # # Plot best vs truth
-    # b = best
-    # Xt = b["X_test"]
-    # mu = b["pred_mean"]
-    # s = torch.sqrt(b["pred_var"])
-    # yt = f_true(Xt)
-
-    # plt.figure()
-    # plt.scatter(X.numpy(), y.numpy(), s=18, alpha=0.8, label="noisy data")
-    # plt.plot(Xt.numpy(), yt.numpy(), linewidth=2, label="true f(x)")
-    # plt.plot(Xt.numpy(), mu.numpy(), linewidth=2, label=f"VIGP best (r={b['r']}, h={b['h']})")
-    # plt.fill_between(Xt.numpy(), (mu - 1.96*s).numpy(), (mu + 1.96*s).numpy(), alpha=0.2, label="95% CI")
-    # plt.scatter(Z.numpy(), f_true(Z).numpy(), s=28, marker="x", label="constraint points (Z)")
-    # plt.title("Case (b) ablation: best setting")
-    # plt.legend()
-    # plt.tight_layout()
-    # plt.show()
-
-    # # Partial vs Full transport experiment (direct ablation plot)
-    # run_partial_vs_full(
-    #     X, y, Z, X_test,
-    #     noise_std=noise_std,
-    #     sf2=10.0, ell=1.5,
-    #     r=2,               
-    #     h_name="softplus",
-    #     steps=1500, lr=2e-2,
-    #     mc_train=64, mc_pred=512,
-    #     seed=123
-    # )
 
     
 
