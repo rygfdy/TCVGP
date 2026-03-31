@@ -12,6 +12,9 @@ NF-TGP (Maroas),2.5464,2.1313,0.3680
 
 BASIS GP (Ray),1.7772,156.5422,0.0930
 
+Monotonic Spline,1.3475,1.8970,0.1180
+
+Monotonic NN,1.9230,2.0830,0.2940
 
 
 caseb
@@ -28,6 +31,9 @@ NF-TGP (Maroas),2.5464,7.1171,0.1370
 
 BASIS GP (Ray),2.4912,308.9280,0.2410
 
+Monotonic Spline,2.2141,2.9321,0.1860
+
+Monotonic NN,2.9211,2.4400,0.1780
 
 
 case c
@@ -44,3 +50,6 @@ NF-TGP (Maroas),2.5464,7.1171,0.1370
 
 BASIS GP (Ray),2.4912,308.9280,0.2410
 
+Monotonic Spline,2.9077,1.9975,0.3260 
+
+Monotonic NN,2.9079,2.4686,0.2030 
