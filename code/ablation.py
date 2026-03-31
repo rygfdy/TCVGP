@@ -332,6 +332,7 @@ def run_one_setting(
     return {
         "r": rank_r,
         "h": h_name,
+        "md": md,
         "RMSE": rmse,
         "NLL": nll,
         "viol_prob": viol,
@@ -342,6 +343,100 @@ def run_one_setting(
         "pred_var": var.detach().cpu(),
         "X_test": X_test.detach().cpu(),
     }
+
+
+def run_md_ablation(
+    X,
+    y,
+    X_test,
+    noise_std,
+    md_list,
+    sf2=10.0,
+    ell=1.5,
+    rank_r=2,
+    h_name="softplus",
+    steps=1500,
+    lr=2e-2,
+    mc_train=64,
+    mc_pred=512,
+    seed=123,
+):
+    results = []
+    for md in md_list:
+        Z = torch.linspace(float(X.min()), float(X.max()), int(md), dtype=X.dtype)
+        out = run_one_setting(
+            X,
+            y,
+            Z,
+            X_test,
+            noise_std,
+            sf2=sf2,
+            ell=ell,
+            rank_r=rank_r,
+            h_name=h_name,
+            steps=steps,
+            lr=lr,
+            mc_train=mc_train,
+            mc_pred=mc_pred,
+            seed=seed,
+            verbose=False,
+        )
+        results.append(out)
+    return results
+
+
+def run_mf_ablation(
+    mf_list,
+    X_test,
+    noise_std,
+    md=8,
+    sf2=10.0,
+    ell=1.5,
+    rank_r=2,
+    h_name="softplus",
+    steps=1500,
+    lr=2e-2,
+    mc_train=64,
+    mc_pred=512,
+    seed=0,
+):
+    max_mf = int(max(mf_list))
+    X_full, y_full = sample_case_b(n=max_mf, noise_std=noise_std, seed=seed)
+    Z = torch.linspace(float(X_full.min()), float(X_full.max()), int(md), dtype=X_full.dtype)
+
+    results = []
+    for mf in mf_list:
+        mf = int(mf)
+        if mf <= 0 or mf > max_mf:
+            raise ValueError(f"mf must be in [1, {max_mf}], got {mf}")
+
+        # Use evenly spread indices from one master dataset so the ablation mainly
+        # reflects sample size rather than a different draw each time.
+        idx = torch.linspace(0, max_mf - 1, mf, dtype=torch.float64).round().long()
+        idx = torch.unique_consecutive(idx)
+        X = X_full[idx]
+        y = y_full[idx]
+
+        out = run_one_setting(
+            X,
+            y,
+            Z,
+            X_test,
+            noise_std,
+            sf2=sf2,
+            ell=ell,
+            rank_r=rank_r,
+            h_name=h_name,
+            steps=steps,
+            lr=lr,
+            mc_train=mc_train,
+            mc_pred=mc_pred,
+            seed=seed,
+            verbose=False,
+        )
+        out["mf"] = int(X.numel())
+        results.append(out)
+    return results
 
 class VIGPFull(nn.Module):
     """
@@ -570,35 +665,146 @@ def main():
     for d in results_sorted:
         print(f"r={d['r']:2d} h={d['h']:9s}  RMSE={d['RMSE']:.4f}  NLL={d['NLL']:.4f}  viol={d['viol_prob']:.2e}")
 
-    # Plot best vs truth
-    b = best
-    Xt = b["X_test"]
-    mu = b["pred_mean"]
-    s = torch.sqrt(b["pred_var"])
-    yt = f_true(Xt)
+    softplus_results = [d for d in results if d["h"] == "softplus"]
+    best_softplus = min(softplus_results, key=lambda d: d["NLL"])
+    best_softplus_r = best_softplus["r"]
+    print(f"\n[md ablation] using h=softplus and best rank from the scan: r={best_softplus_r}")
 
-    plt.figure()
-    plt.scatter(X.numpy(), y.numpy(), s=18, alpha=0.8, label="noisy data")
-    plt.plot(Xt.numpy(), yt.numpy(), linewidth=2, label="true f(x)")
-    plt.plot(Xt.numpy(), mu.numpy(), linewidth=2, label=f"VIGP best (r={b['r']}, h={b['h']})")
-    plt.fill_between(Xt.numpy(), (mu - 1.96*s).numpy(), (mu + 1.96*s).numpy(), alpha=0.2, label="95% CI")
-    plt.scatter(Z.numpy(), f_true(Z).numpy(), s=28, marker="x", label="constraint points (Z)")
-    plt.title("Case (b) ablation: best setting")
-    plt.legend()
-    plt.tight_layout()
+    # md_list = [2, 4, 6, 8, 10, 12, 16]
+    md_list = [50, 60, 70, 80, 90, 100]
+    md_results = run_md_ablation(
+        X,
+        y,
+        X_test,
+        noise_std=noise_std,
+        md_list=md_list,
+        sf2=10.0,
+        ell=1.5,
+        rank_r=best_softplus_r,
+        h_name="softplus",
+        steps=1500,
+        lr=2e-2,
+        mc_train=64,
+        mc_pred=512,
+        seed=123,
+    )
+
+    print("\n=== md Ablation (softplus) ===")
+    print("md  | RMSE    | NLL     | TIME(s)")
+    print("-" * 33)
+    for d in md_results:
+        print(f"{d['md']:>2d}  | {d['RMSE']:.4f} | {d['NLL']:.4f} | {d['train_sec']:.1f}")
+
+    md_vals = [d["md"] for d in md_results]
+    md_rmse = [d["RMSE"] for d in md_results]
+    md_nll = [d["NLL"] for d in md_results]
+    md_time = [d["train_sec"] for d in md_results]
+
+    fig, axes = plt.subplots(1, 3, figsize=(13.5, 3.8))
+    axes[0].plot(md_vals, md_rmse, marker="o", color="forestgreen", linewidth=2)
+    axes[0].set_title("RMSE vs md")
+    axes[0].set_xlabel("md")
+    axes[0].set_ylabel("RMSE")
+    axes[0].grid(True, alpha=0.3)
+
+    axes[1].plot(md_vals, md_nll, marker="o", color="crimson", linewidth=2)
+    axes[1].set_title("NLL vs md")
+    axes[1].set_xlabel("md")
+    axes[1].set_ylabel("NLL")
+    axes[1].grid(True, alpha=0.3)
+
+    axes[2].plot(md_vals, md_time, marker="o", color="steelblue", linewidth=2)
+    axes[2].set_title("Time vs md")
+    axes[2].set_xlabel("md")
+    axes[2].set_ylabel("train seconds")
+    axes[2].grid(True, alpha=0.3)
+
+    fig.suptitle(f"Constraint-point ablation (softplus, r={best_softplus_r})")
+    fig.tight_layout()
     plt.show()
 
-    # Partial vs Full transport experiment (direct ablation plot)
-    run_partial_vs_full(
-        X, y, Z, X_test,
+    print(f"\n[mf ablation] using h=softplus, r={best_softplus_r}, md={md}")
+
+    mf_list = [10, 15, 20, 30, 40, 50]
+    mf_results = run_mf_ablation(
+        mf_list=mf_list,
+        X_test=X_test,
         noise_std=noise_std,
-        sf2=10.0, ell=1.5,
-        r=2,               # 用你表格里比较稳的
+        md=md,
+        sf2=10.0,
+        ell=1.5,
+        rank_r=best_softplus_r,
         h_name="softplus",
-        steps=1500, lr=2e-2,
-        mc_train=64, mc_pred=512,
-        seed=123
+        steps=1500,
+        lr=2e-2,
+        mc_train=64,
+        mc_pred=512,
+        seed=0,
     )
+
+    print("\n=== mf Ablation (softplus) ===")
+    print("mf  | RMSE    | NLL     | TIME(s)")
+    print("-" * 33)
+    for d in mf_results:
+        print(f"{d['mf']:>2d}  | {d['RMSE']:.4f} | {d['NLL']:.4f} | {d['train_sec']:.1f}")
+
+    mf_vals = [d["mf"] for d in mf_results]
+    mf_rmse = [d["RMSE"] for d in mf_results]
+    mf_nll = [d["NLL"] for d in mf_results]
+    mf_time = [d["train_sec"] for d in mf_results]
+
+    fig, axes = plt.subplots(1, 3, figsize=(13.5, 3.8))
+    axes[0].plot(mf_vals, mf_rmse, marker="o", color="darkorange", linewidth=2)
+    axes[0].set_title("RMSE vs mf")
+    axes[0].set_xlabel("mf")
+    axes[0].set_ylabel("RMSE")
+    axes[0].grid(True, alpha=0.3)
+
+    axes[1].plot(mf_vals, mf_nll, marker="o", color="purple", linewidth=2)
+    axes[1].set_title("NLL vs mf")
+    axes[1].set_xlabel("mf")
+    axes[1].set_ylabel("NLL")
+    axes[1].grid(True, alpha=0.3)
+
+    axes[2].plot(mf_vals, mf_time, marker="o", color="teal", linewidth=2)
+    axes[2].set_title("Time vs mf")
+    axes[2].set_xlabel("mf")
+    axes[2].set_ylabel("train seconds")
+    axes[2].grid(True, alpha=0.3)
+
+    fig.suptitle(f"Training-point ablation (softplus, r={best_softplus_r}, md={md})")
+    fig.tight_layout()
+    plt.show()
+
+    # # Plot best vs truth
+    # b = best
+    # Xt = b["X_test"]
+    # mu = b["pred_mean"]
+    # s = torch.sqrt(b["pred_var"])
+    # yt = f_true(Xt)
+
+    # plt.figure()
+    # plt.scatter(X.numpy(), y.numpy(), s=18, alpha=0.8, label="noisy data")
+    # plt.plot(Xt.numpy(), yt.numpy(), linewidth=2, label="true f(x)")
+    # plt.plot(Xt.numpy(), mu.numpy(), linewidth=2, label=f"VIGP best (r={b['r']}, h={b['h']})")
+    # plt.fill_between(Xt.numpy(), (mu - 1.96*s).numpy(), (mu + 1.96*s).numpy(), alpha=0.2, label="95% CI")
+    # plt.scatter(Z.numpy(), f_true(Z).numpy(), s=28, marker="x", label="constraint points (Z)")
+    # plt.title("Case (b) ablation: best setting")
+    # plt.legend()
+    # plt.tight_layout()
+    # plt.show()
+
+    # # Partial vs Full transport experiment (direct ablation plot)
+    # run_partial_vs_full(
+    #     X, y, Z, X_test,
+    #     noise_std=noise_std,
+    #     sf2=10.0, ell=1.5,
+    #     r=2,               
+    #     h_name="softplus",
+    #     steps=1500, lr=2e-2,
+    #     mc_train=64, mc_pred=512,
+    #     seed=123
+    # )
 
     
 
