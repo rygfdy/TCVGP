@@ -1,7 +1,3 @@
-# ablation_vigp_caseb_r_h.py
-# Requirements: python>=3.9, torch, numpy, matplotlib
-# Run: python ablation_vigp_caseb_r_h.py
-
 import math
 import time
 import numpy as np
