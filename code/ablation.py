@@ -209,7 +209,7 @@ def elbo(model: VIGP, y, Sigma, noise_std, n_mc=64):
     return (loglik + logprior - logq).mean()
 
 # -----------------------------
-# Prediction: use Monte Carlo moments of g then propagate (paper eq 29-31) :contentReference[oaicite:2]{index=2}
+# Prediction
 # -----------------------------
 def predict_from_q_moments(X_train, Z, X_test, Sigma, sf2, ell, model: VIGP, n_mc=2000,
                            cov_shrink=1e-3, jitter=1e-8):
